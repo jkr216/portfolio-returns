@@ -1,0 +1,115 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+## On Returns
+First we need to choose a portfolio - spoiler alert, once we choose this portfolio, we are going to stick with it throughout the remainder of the book. 
+
+
+```{r setup}
+library(tidyverse)
+library(tidyquant)
+library(highcharter)
+library(timetk)
+library(tibbletime)
+```
+
+
+## Build Portfolio
+
+For this chapter we will be working with a 5-asset portfolio consisting of the following.
+
+    + SPY (S&P500 fund) weighted 25%
+    + EFA (a non-US equities fund) weighted 25%
+    + IJS (a small-cap value fund) weighted 20%
+    + EEM (an emerging-mkts fund) weighted 15%
+    + AGG (a bond fund) weighted 10%
+    
+On to step 1, wherein we import adjusted prices for the 5 ETFs to be used in our porftolio and save them to an `xts` object called `prices`.
+
+We need a vector of ticker symbols that we will then pass to Yahoo! Finance via the `getSymbols` function from the `quantmod` package. This will return an object with the opening price, closing price, adjusted price, daily high, daily low and daily volume. We don't want to work with all of those, though. The adjusted price is what we need. 
+
+To isolate the adjusted price, we use the `map` function from the `purrr` package and apply `Ad(get(.))` to the imported prices. This will 'get' the adjusted price from each of our individual price objects. We could stop here and have the right substance, but the format wouldn't be great as we would have a `list` of 5 adjusted prices. The `map` function returns a list by default. 
+
+The `reduce(merge)` function will allow us to merge the lists into one object and coerce back to an `xts` structure.  Finally, we want intuitive column names and use `colnames<-` to rename the columns.  The `rename` function from `dplyr` will not work well here because the object structure has gone back to `xts`.
+
+```{r, message=FALSE, warning=FALSE}
+symbols <- c("SPY","EFA", "IJS", "EEM","AGG")
+
+prices <- 
+  getSymbols(symbols, src = 'yahoo', from = "2016-01-01", 
+             auto.assign = TRUE, warnings = FALSE) %>% 
+  map(~Ad(get(.))) %>% 
+  reduce(merge) %>%
+  `colnames<-`(symbols)
+
+```
+
+Next we want to turn those daily prices into monthly returns. First, we will keep returns in the `xts` object and use the `to.monthly` function from the [quantmod](https://www.quantmod.com/) to turn daily prices to monthly prices, then `Return.calculate(prices_monthly, method = "log")` to convert to returns.
+
+```{r, message=FALSE, warning=FALSE}
+
+prices_monthly <- to.monthly(prices, indexAt = "first", OHLC = FALSE)
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+portfolioComponentReturns <- na.omit(Return.calculate(prices_monthly, method = "log"))
+
+head(portfolioComponentReturns)
+```
+
+Take a quick look at the monthly returns above, to make sure things appear to be in order. 
+
+```{r}
+test1 <- prices %>%
+  tk_tbl(preserve_index = TRUE, rename_index = "date") %>%
+  gather(asset, prices, -date) %>% 
+  group_by(asset) %>%
+  tq_transmute(mutate_fun = periodReturn, period = "monthly") %>% 
+  spread(asset, monthly.returns) %>% 
+  select(date, symbols)
+
+test2 <- prices %>% 
+  tk_tbl(preserve_index = TRUE, rename_index = "date") %>%
+  tbl_time(index = "date") %>% 
+  as_period("monthly",  side = "end") %>%
+  gather(asset, returns, -date) %>% 
+  group_by(asset) %>% 
+  tq_transmute(mutate_fun = periodReturn) %>% 
+  spread(asset, monthly.returns) %>% 
+  select(date, symbols)
+
+na.omit(Return.calculate(prices_monthly, method = "log")
+str(tbltimetest)
+```
+
+
+Now on to constructing a portfolio and calculating portfolio returns. To turn these 5 ETFs in a porftolio we need to assign them weights. Let's first create a weights vector.
+
+
+```{r, message = FALSE}
+w <- c(0.25, 0.20, 0.20, 0.25, 0.10)
+```
+
+Before we use the weights in our calculations, a quick sanity check in the next code chunk. This might not be necessary with 5 assets as we have today, but good practice because if we had 50 assets it could save us a lot of grief to catch a mistake early.
+
+```{r Weights Sanity Check}
+# Make sure the weights line up with assets.
+asset_weights_sanity_check <- tibble(w, symbols)
+asset_weights_sanity_check
+```
+
+And make sure they sum to 100%, or 1.
+
+```{r}
+sum(asset_weights_sanity_check$w)
+```
+
+They sum to 1. Good to go and on to standard deviation.
+
+
+
+
+
