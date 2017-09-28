@@ -4,7 +4,6 @@ output:
   html_notebook: default
 ---
 
- 
 ```{r setup, message = FALSE, include = FALSE}
 # packages required for this post
 for (pkg in c('tidyverse', 'tidyquant', 'timetk', 'tibbletime', 'highcharter')) 
@@ -12,9 +11,9 @@ for (pkg in c('tidyverse', 'tidyquant', 'timetk', 'tibbletime', 'highcharter'))
 knitr::opts_chunk$set(message=FALSE, warning=FALSE)
 ```
 
-In our previous post, we reviewed how to import daily prices and transform to monthly log returns and we reviewed 4 methods for making the transformation.  Today, we will work with just two of the objects from that post. 
+In a [previous post](http://www.reproduciblefinance.com/2017/09/25/asset-prices-to-log-returns/), we reviewed how to import daily prices and 4 methods to transform daily prices to monthly log returns.  Today, we will focus on visualizing those monthly log returns. 
 
-By way of quick reminder, we are building toward analyzing the returns of a 5-asset portfolio consisting of the following.
+By way of quick reminder, our ultimate goal is to build, analyze and simulate the returns of a 5-asset portfolio consisting of the following.
 
     + SPY (S&P500 fund) weighted 25%
     + EFA (a non-US equities fund) weighted 25%
@@ -32,7 +31,7 @@ library(tibbletime)
 library(highcharter)
 ```
 
-Pure repetition from last time: we will create one `xts` object and one tibble, in long format, of monthly log returns
+To get our objects into the global environment, the next code chunk is copy/paste from the previous post: we will create one `xts` object and one `tibble`, in long/tidy format, of monthly log returns.
 
 ```{r}
 # The symbols vector holds our tickers. 
@@ -59,9 +58,10 @@ asset_returns_long <-
   mutate(returns = (log(returns) - log(lag(returns))))
 ```
 
-We now have two objects holding monthly log returns, `assets_returns_xts` and `assets_returns_long`.  We will use `highcharter` to first visualize the `xts` formatted returns.
+We now have two objects holding monthly log returns, `asset_returns_xts` and `asset_returns_long`.  
+First, let's use `highcharter` to  visualize the `xts` formatted returns.
 
-Highcharter is fantastic for visualizing a time series or many time series.  First, we set `highchart(type = "stock")` to get a nice time series line. Then we intuitively add each of our series to the highcharter code flow. In this case, we'll add our columns from the xts object.
+Highcharter is fantastic for visualizing a time series or many time series.  First, we set `highchart(type = "stock")` to get a nice time series line. Then we add each of our series to the highcharter code flow. In this case, we'll add our columns from the xts object.
 
 ```{r}
 highchart(type = "stock") %>% 
@@ -78,22 +78,23 @@ highchart(type = "stock") %>%
 
 ```
 
-We included only the first 3 time series above and it's already starting to get crowded. Besides that, the time series of log returns isn't giving much intuition about the distribution of the log returns. Highcharter does have the capacity for histogram making. One method is to first call the base function `hist` on the data along with the arguments for bin number and `plot = FALSE`. Then we can call `hchart` on that object. 
+Take a look at the chart. It has a line for the monthly log returns of 3 of our ETFs (and in my opinion it's already starting to get crowded). We might be able to pull some useful intuition from this chart. Perhaps one of our ETFs remained stable the 2008 financial crisis, or had an era of consistently negative/positive returns. Highcharter is great for plotting time series line charts.
 
-```{r, out.width= "70%"}
-hc_spy <- hist(asset_returns_xts$SPY, breaks = 30, plot = FALSE)
+Highcharter does have the capacity for histogram making. One method is to first call the base function `hist` on the data along with the arguments for breaks and `plot = FALSE`. Then we can call `hchart` on that object. 
+
+```{r}
+hc_spy <- hist(asset_returns_xts$SPY, breaks = 50, plot = FALSE)
 
 hchart(hc_spy) %>% 
   hc_title(text = "SPY Log Returns Distribution")
 ```
 
-Nothing wrong with that chart and it shows us the distribution. However, `highcharter` is missing an easy way to chart multiple histograms and to add density lines to those multiple historgrams.  The functionality is fine for one set of returns (as we'll see when we get to the portfolio) but here we want to see the distribution of all of our returns series together. 
+Nothing wrong with that chart and it shows us the distribution of SPY returns. However, `highcharter` is missing an easy way to chart multiple histograms and to add density lines to those multiple histograms.  The functionality is fine for one set of returns (as we'll see when we get to the portfolio) but here we want to see the distribution of all of our returns series together. 
 
-For that, we will head to the tidyverse and use `ggplot` on our tidy tibble `assets_returns_long`. Because it is in long, tidy format, and it is grouped by the 'asset' column, we can chart the assets individually on one chart. 
+For that, we will head to the tidyverse and use `ggplot2` on our tidy `tibble` `assets_returns_long`. Because it is in long, tidy format, and it is grouped by the 'asset' column, we can chart the asset histograms collectively on one chart. 
 
 ```{r}
-
-# Make so all titles centered
+# Make so all titles centered in the upcoming ggplots
 theme_update(plot.title = element_text(hjust = 0.5))
 
 asset_returns_long %>% 
@@ -111,19 +112,20 @@ asset_returns_long %>%
   ggtitle("Monthly Returns Since 2005")
 ```
 
+Maybe we don't want to use a histogram, but instead want to use a density line to visualize the various distributions. We can use the `stat_density(geom = "line", alpha = 1)` function to do this. The `alpha` argument is selecting a line thickness. Let's also add a label to the x and y axis with the `xlab` and `ylab` functions.
 
 ```{r}
 
 asset_returns_long %>% 
   ggplot(aes(x = returns, colour = asset, fill = asset)) +
   stat_density(geom = "line", alpha = 1) +
-  #facet_wrap(~asset) +
   ggtitle("Monthly Returns Since 2005") +
   xlab("monthly returns") +
   ylab("distribution") 
 
 ```
 
+That chart is quite digestible, but we can also `facet_wrap(~asset)` to break the densities out into individual charts.
 
 ```{r}
 asset_returns_long %>% 
@@ -135,9 +137,9 @@ asset_returns_long %>%
   ylab("distribution") 
 ```
 
-Now we can combine each of these plots into one nice, faceted plot. 
+Now we can combine all of our ggplots into one nice, faceted plot. 
 
-We will also do some heavy editing of the aesthetics of the plot. First off, let's choose a different color besides black to be the theme. I will go with cornflower blue, because it's a nice shade of blue and I don't see it used very frequently elsewhere. Once we have a color, we can choose the different elements of the chart to change in the the `theme` function. I make a lot of changes here by way of example but feel free to comment out a few of those lines and see the different options.
+At the same time, to add to the aesthetic toolkit a bit, we will do some editing to the label colors. First off, let's choose a different color besides black to be the theme. I will go with cornflower blue, because it's a nice shade and I don't see it used very frequently elsewhere. Once we have a color, we can choose the different elements of the chart to change in the the `theme` function. I make a lot of changes here by way of example but feel free to comment out a few of those lines and see the different options.
 
 
 ```{r}
@@ -149,9 +151,10 @@ asset_returns_long %>%
   ggtitle("Monthly Returns Since 2005") +
   xlab("monthly returns") +
   ylab("distribution") +
+  # Lots of elements can be customized in the theme() function
   theme(plot.title = element_text(colour = "cornflowerblue"),  
-        strip.text.x = element_text(size = 8, colour = "cornflowerblue"), 
-        strip.background = element_rect(colour = "cornflowerblue", fill = "white"), 
+        strip.text.x = element_text(size = 8, colour = "white"), 
+        strip.background = element_rect(colour = "white", fill = "cornflowerblue"), 
         axis.text.x = element_text(colour = "cornflowerblue"), 
         axis.text = element_text(colour = "cornflowerblue"), 
         axis.ticks.x = element_line(colour = "cornflowerblue"), 
@@ -163,7 +166,15 @@ asset_returns_long %>%
         )
 ```
 
-Eye-balling this, it appears that SPY and IJS are slightly right-skewed and AGG is the most peaked around 0.  That is far from a rigorous analysis but that's not we're after here. This chart of monthly returns is a tool to quickly glance at the data and see if anything unusual jumps out, or some sort of hypothesis comes to mind. We are going to be combining these assets into a portfolio and once that occurs, we will rarely view them in isolation again. These visualizations at least allow, or encourage, us to focus on the individual components before building the portfolio. 
+We now have one chart, with histograms and line densities broken out for each of our assets. This would scale nicely if we had more assets and wanted to peek at more distributions of returns.
+
+We have not done any substantive work today but the chart of monthly returns is a tool to quickly glance at the data and see if anything unusual jumps out, or some sort of hypothesis comes to mind. We are going to be combining these assets into a portfolio and, once that occurs, we will rarely view the assets in isolation again. Before that leap to portfolio building, it's a good idea to glance at the portfolio component distributions. 
+
+
+
+
+
+
 
 
 

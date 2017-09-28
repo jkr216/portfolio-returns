@@ -1,10 +1,10 @@
 ---
 title: "Prices Periods Returns Chapter"
 output:
-  html_notebook: default
+  pdf_document: default
   html_document:
     df_print: paged
-  pdf_document: default
+  html_notebook: default
 ---
 
 
@@ -21,14 +21,14 @@ Returns.
 
 Where are we headed in this chapter. 
 
-1) From a practical perspective, here's what we need to do. 
+From a practical perspective, here's what we need to do. 
 Import prices for each of our assets. Here we will be building a 5-asset portfolio, that is balanced and diversified, we believe. 
 
 We will import daily prices for our 5 assets since January 1, 2005. 
 
-Our prices will be imported daily, consist of open, close, adjusted, volume, high, low. first decision: time period, which group - adjusted. then, which period, keep daily, convert to monthly, weekly, quarterly. we'll go with monthly. Now we have monthly prices for a certain time period for 5 stocks. we need to convert those prices to returns - what kind? log returns as will be important when we simulate. 
+Our prices will be daily, consist of open, close, adjusted, volume, high, low. first decision: time period, which group - adjusted. then, which period, keep daily, convert to monthly, weekly, quarterly. we'll go with monthly. Now we have monthly prices for a certain time period for 5 stocks. we need to convert those prices to returns - what kind? log returns as will be important when we simulate. 
 
-2) from a workflow perspective, we have just plunged into the data science process, which in the tidyverse we think of as beginning with data import and then progressing to data wrangling - which means getting the 'raw' data into the format we want to use. Here, the 'raw' data are a time series of prices for our 5 stocks, taken from Yahoo! finance. Important things to think about: 
+From a workflow perspective, we have just plunged into the data science process, which in the tidyverse we think of as beginning with data import and then progressing to data wrangling - which means getting the 'raw' data into the format we want to use. Here, the 'raw' data are a time series of prices for our 5 stocks, taken from Yahoo! finance. Important things to think about: 
 
 The source - in industry, you almost certainly won't be pulling from yahoo! or google, you will have an internal database or data lake that holds the time series data. For anyone wishing to reproduce or reuse or build upon your work, a crucial first step is being able to import or update your raw data. It's a simple but oft overlooked first step that needs to be made clear. 
 
@@ -52,7 +52,7 @@ This is about mapping the Hadley data science paradigm onto the world of portfol
 ]
 
 
-## Choose Portfolio Building Block
+## Choose Portfolio Building Blocks and Import Prices
 
 For this chapter we will be working with a 5-asset portfolio consisting of the following.
 
@@ -63,8 +63,6 @@ For this chapter we will be working with a 5-asset portfolio consisting of the f
     + AGG (a bond fund) weighted 10%
 
 I chose those 5 assets because they seem to offer a balanced blend of large, small, international, emerging and bond exposure. We will include several Shiny apps with each chapter and that will afford the opportunity to choose different assets and see different results.  For the code included in this book, we will not change or deviate from these 5 assets.
-
-### Importing the data
 
 On to step 1, wherein we import adjusted prices for the 5 ETFs to be used in our porftolio and save them to an `xts` object called `prices`.
 
@@ -88,147 +86,233 @@ prices <-
 
 ```
 
+We now have an `xts` object of the adjusted prices for our 5 assets. Have a quick peek.
 
-### Convert Daily Prices to Monthly Returns
+```{r}
+head(prices)
+```
 
+## Convert Daily Prices to Monthly Log Returns
 
 Next we want to turn those daily prices into monthly returns. This seems like a rather innocuous step in our work, but it involves two important decisions to be highlighted in the name of reproducibility. First, we are changing time periods from daily to monthly.  Not crucial, but we are transforming our data. We need to explain how that's happening.
 
 More importantly, we will be transforming our data from its raw form, adjusted prices, to a calculated form, log returns.  
 
-This is such a simple step that temptation is to include a few lines of code and move on to the analysis, which is the stuff our team gets paid to do. But, converting to log returns is our first major data process decision: why did we choose log returns instead of simple returns? It's a standard practice to use log returns but it's also a good chance to set the precedent amongst our team and within our workflow that we justify and explain decisions about our data.  If we have made the decision to work with log returns across our work, we should point to an R Notebook or a PDF that explains the decision and the brief substantive justification.  In this case, I know that simulating returns is in our future, and we will be assuming a normal distribution of returns. Thus, I choose to convert to log returns. In industry and when establishing a data science practice, an explanatory R Notebook can serve three purposes. First, for new team members, they will have a reference library that helps contextualize team-wide decisions.  Second, should anyone every ask, why have we chosen log returns as the standard? The team can point to the reference material, and invite theoretical disagreements should the questioner not agree with that material. Third, it sets the standard for a best practice: this team justifies decisions that affect our data and conclusions.  
+This is such a standard step that the temptation is to include a few lines of code and move on to the analysis, which is the stuff our team gets paid to do. But, converting to log returns is our first major data process decision: why did we choose log returns instead of simple returns? It's a standard practice to use log returns but it's also a good chance to set the precedent amongst our team and within our workflow that we justify and explain decisions about our data.  If we have made the decision to work with log returns across our work, we should point to an R Notebook or a PDF that explains the decision and the brief substantive justification.  
 
-For the purposes of this book, we will actually and visualize the difference between log returns and simple returns as part of our workflow. 
+In this case, I know that simulating returns is in our future, and we will be assuming a normal distribution of returns. Thus, I choose to convert to log returns. In industry and when establishing a data science practice, an explanatory R Notebook can serve three purposes. First, for new team members, they will have a reference library that helps contextualize team-wide decisions.  Second, should anyone every ask, why have we chosen log returns as the standard? The team can point to the reference material, and invite theoretical disagreements should the questioner not agree with that material. Third, it sets the standard for a best practice: this team justifies decisions that affect our data and conclusions.  
 
-First, we will use the `to.monthly` function from the [quantmod](https://www.quantmod.com/) to turn daily prices to monthly prices. 
+
+### The XTS World
+
+What is XTS? How diff from tidy
+
+Our first reading in the `prices` object is from January 3, 2005 (the first trading day of that year) and we have daily prices.  Let's stay in the`xts`world and convert to monthly prices using a call to `to.monthly(prices, indexAt = "last", OHLC = FALSE)` from `quantmod`.  The argument `index = "last"` tells the function whether we want to index to the first day of the month or the last day. 
 
 ```{r, message=FALSE, warning=FALSE}
-
 prices_monthly <- to.monthly(prices, indexAt = "last", OHLC = FALSE)
+
+head(prices_monthly)
+
 ``` 
 
+We have moved from an `xts` object of daily prices to an `xts` object of monthly prices.
 
-
-Now we'll call `Return.calculate(prices_monthly, method = "log")` to convert to returns and save as an object call `portfolio_component_returns`.
+Now we'll call `Return.calculate(prices_monthly, method = "log")` to convert to returns and save as an object called `assed_returns_xts`. Note this will give us log returns by the `method = "log"` argument. We could have used `method = "discrete"` to get simple returns.
 
 ```{r, message=FALSE, warning=FALSE}
 asset_returns_xts <- na.omit(Return.calculate(prices_monthly, method = "log"))
 
-head(index(asset_returns_xts))
+head(asset_returns_xts)
 ```
 
-Take a quick look at the monthly returns above, to make sure things appear to be in order. Notice in particular the date of the first value. We imported prices starting "2005-01-01" yet our first monthly return is for "2005-02-28".  That is not necessarily good or bad, but it might matter if that first month's returns makes a difference in our analysis. 
+Take a quick look at the monthly returns above, to make sure things appear to be in order. Notice in particular the date of the first value. We imported prices starting "2005-01-01" yet our first monthly return is for "2005-02-28". This is because we used the argument `indexAt = "last"` when we cast to a monthly periodicity (try changing to `indexAt = "first"` and see the result).  That is not necessarily good or bad, but it might matter if that first month's returns makes a difference in our analysis and the broader issue is that our decisions in data transformation can affect the data that ultimately survives to our analytical stage.
 
-We are not going to take that same raw data, which is the `prices` object we created upon data import and convert it to monthly returns using 2 alternative methods. We will make use of the `tidyquant`, `timetk` and `tibbletime` packages. 
+From a subtantive perspective, we could stop right now. Our task has been accomplished: we have imported daily prices, trimmed to adjusted prices, moved to monthly prices and transformed to monthly log returns. 
 
-Let's get to the code flow before explaining the motivation for doing seemingly redundant work. 
+For now, though, let's take a look at a few more methods.
 
-[OR explain the motivation right here]
+### The Tidyverse and Tidyquant World
 
-First we will use just `tidyquant` and `timetk` to convert our object from an xts object of prices to a `tibble` of monthly returns. Once we convert to `tibble` the tidyverse is available for all sort of manipulations. 
+We now take the same raw data, which is the `prices` object we created upon data import and convert it to monthly returns using 3 alternative methods. We will make use of the `dplyr`, `tidyquant`, `timetk` and `tibbletime` packages and switch from the `xts` world to the tidy world.
 
-In the piped workflow below, our first step is to use the `tk_tbl(preserve_index = TRUE, rename_index = "date")` function to convert from xts to tibble. The two arguments will convert the `xts` date index to a date column, and rename it "date". If we stopped here, we would have a new prices object in tibble format. 
+Again, [the diff between xts and tidy, and briefly why we might want to.]
 
+For our first method,  we use  `dplyr` and `timetk` to convert our object from an `xts` object of prices to a `tibble` of monthly returns. Once we convert to a `tibble` the tidyverse is available for all sort of manipulations. 
 
+Let's step through the logic before getting to the code chunk.
+
+In the piped workflow below, our first step is to use the `tk_tbl(preserve_index = TRUE, rename_index = "date")` function to convert from `xts` to `tibble`. The two arguments will convert the `xts` date index to a date column, and rename it "date". If we stopped here, we would have a new prices object in `tibble`  format. 
+
+Next we turn to `dplyr` to `gather` our new dataframe into long format and then `group_by` asset. We have not done any calculations yet, we have just shifted from wide format, to long, tidy format. Notice that when we gathered our data, we renamed one of the columns to `returns` even though the data are still prices. The next step will explain why we did that.
+
+Next, we want to calculate log returns and add those returns to the data frame.  We will use `mutate` and our own calculation to get log returns: `mutate(returns = (log(returns) - log(lag(returns))))`. Notice that I am putting our new log returns into the `returns` column by calling `returns = ...`. This is going to remove the price data and replace it with log returns data. This is the explanation for why, when we called `gather` in the previous step, we renamed the column to `returns`. That allows us to simply replace that column with log return data instead of having to create a new column and then delete the price data column.
+
+Our last two steps are to `spread` the data back to wide format, which makes it easier to compare to the `xts` object and easier to read, but is not a best practice in the tidyverse. We are going to look at this new object and compare to the `xts` object above, so we will stick with wide format for now.   
+
+Finally, we want to reorder the columns to align with the `symbols` vector. That's important because when we build a portfolio, we will use that vector to coordinate our different weights. 
 
 ```{r}
-# Use the xts prices that were converted to monthly
-# Then timetk
-asset_returns_tk_byhand <- 
-  prices_monthly %>% 
+asset_returns_dplyr_byhand <- prices %>% 
+  to.monthly(indexAt = "last", OHLC = FALSE) %>% 
   tk_tbl(preserve_index = TRUE, rename_index = "date") %>%
   gather(asset, returns, -date) %>% 
   group_by(asset) %>%  
   mutate(returns = (log(returns) - log(lag(returns)))) %>%
   spread(asset, returns) %>% 
   select(date, symbols)
+```
 
+For our second method in the tidy world, we'll use the `tq_transmute` function from `tidyquant`.  Instead of using `to.monthly` and `mutate`, and then supplying our own calculation, we use `tq_transmute(mutate_fun = periodReturn, period = "monthly", type = "log")` and go straight from daily prices to monthly log returns. Note that we select the period as 'monthly' in that function call, which means we can pass in the raw daily `prices` `xts` object.. 
+
+```{r}
 asset_returns_tq_builtin <- prices %>%
   tk_tbl(preserve_index = TRUE, rename_index = "date") %>%
   gather(asset, prices, -date) %>% 
   group_by(asset) %>%
   tq_transmute(mutate_fun = periodReturn, period = "monthly", type = "log") %>% 
   spread(asset, monthly.returns) %>% 
-  # We want to make sure the columns are in the order that we think they are
   select(date, symbols)
-
 ```
 
-Take a look at the new returns object and notice that it looks identical to the previous returns object. There is one big difference which is that it is a tibble object instead of an xts object. More importantly, this object is not in tidy format.  
+Our third method in the tidy world will produce the same output as the previous two - a `tibble` of monthly log returns - but we will also introduce the `tibbletime` package and it's function `as_period`.  As the name implies, this function allows us to cast the prices time series from daily to monthly (or weekly or quarterly etc.) in our `tibble` instead of having to apply the `to.monthly` function to the `xts` object as we did previously. 
 
-The next code flow will accomplish exactly the same thing, but we will also introduce the `tibbletime` package and it's function `as_period`.  As the name implies, this function allows us to cast the prices time series from daily to monthly (or weekly or quarterly etc.), before calculating returns. Whereas above we went from daily to prices to monthly returns, here we go from daily prices to monthly prices to monthly returns.  
+Furthermore, unlike the previous code chunk above where we went from daily prices straight to monthly returns, here we go from daily prices to monthly prices to monthly returns.  That is, we will first create a `tibble` of monthly prices, then pipe to create monthly returns.  
 
-We don't have a substantive reason for doing that here, but it could prove useful for recasting date periods in financial data. 
-
+We don't have a substantive reason for doing that here, but it could prove useful if there's a time when we need to get monthly prices in isolation during a tidyverse-based piped workflow.
 
 ```{r}
-
 asset_returns_tbltime <- prices %>% 
   tk_tbl(preserve_index = TRUE, rename_index = "date") %>%
   tbl_time(index = "date") %>% 
   as_period("monthly", side = "end") %>%
   gather(asset, returns, -date) %>% 
   group_by(asset) %>% 
-  tq_transmute(mutate_fun = periodReturn, period = "monthly", type = "log") %>% 
+  tq_transmute(mutate_fun = periodReturn, type = "log") %>% 
   spread(asset, monthly.returns) %>% 
   select(date, symbols)
-
 ```
 
-Let's take a peek at our three monthly return objects.
+Let's take a peek at our 4 monthly log return objects.
 
 ```{r}
-head(asset_returns_tbltime)
-head(asset_returns_tqtbl)
 head(asset_returns_xts)
+head(asset_returns_dplyr_byhand)
+head(asset_returns_tq_builtin)
+head(asset_returns_tbltime)
+```
+Do we notice anything of interest?
+
+First, have a look at the left most column in each object, where the date is stored. The `asset_returns_xts` has a date index, not a column. It is accessed via `index(asset_returns_xts)`. The data frame objects have a column called "date", accessed via the `$date` convention, e.g. `asset_returns_dplyr_byhand$date`. 
+
+Second, notice the first observation in each of the objects. For some reason, only one of our objects, `asset_returns_tq_builtin`, contains a value for the row of January 2005. `asset_returns_dplyr_byhand` reports a January 2005 return of NA, `asset_returns_dplyr_byhand` reports a 0.00, and `asset_returns_xts` simply excludes the observation.  Does it matter? Well, probably yes.  It will affect all of our analysis for the remainder of this book and if we were constructing a true trading strategy or portfolio management workflow, real money could be affected if we use the object that includes or excludes the first observation.
+
+Third, each of these objects is in "wide" format, which in this case means there is a column for each of our assets.  When we called `spread` at the end of the piped code flow, we put the data frames back to wide format.
+
+This is the format that `xts` likes and it's the format that is easier to read as a human. However, the tidyverse wants this data to be in long or tidy format so that each variable has its own column.
+
+For our asset_returns objects, that would mean a column called "date", a colum called "asset" and a column called "returns".  To see that in action, here is how it looks.
+
+```{r}
+asset_returns_long <- 
+  asset_returns_dplyr_byhand %>% 
+  gather(asset, returns, -date)
+
+head(asset_returns_long)
 ```
 
-Do we notice anything of interest? 
+We now have 3 columns and if we want to run an operation like `mutate` on each asset, we just need to call `goup_by(asset)` in the piped flow.
 
-For some reason, only one of our objects, `asset_returns_tqtbl`, contains a value for the month of January. `asset_returns_tbltime_byhand` reports a January 2005 return of NA, and `asset_returns_xts` simply excludes the observation.  Does it matter? Well, probably yes.  It will affect all of our analysis for the remainder of this book and if we were constructing a true trading strategy or portfolio management workflow, real money could be affected if we use the object that includes or excludes the first observation.
+Before we conclude, I would be remiss without calling out an important point that I skipped for the sake of brevity. We transformed daily prices to monthly log returns, but never explained, justified or mentioned why we chose log returns instead of simple returns. 
 
-Since our goal was to start at January 1, we will work with the most inclusive object and keep the January 2005 return as part of our data set.  
+We are making an assumption that our colleagues, collaborators or clients understand and agree with that decision.  Even if they happen to do so, we should explain our transformation as a matter of best practice: justify the logic for data transformations, even if those transformations represent a standard operating procedure. Else, we might have a team that starts to skip the logic when the data transformations are a bit more non-standard, or even controversial.  Since we might perform this prices to log returns in several projects, we could simply have one [R Notebook](http://rmarkdown.rstudio.com/r_notebooks.html) that our team references to explain why we use log returns. Over time, we can build a repository of documents that explain the theory behind our data tidying and transformation practices. 
+
+### A Word on workflow and recap
  
-Let's recap what we've done thus far. We have imported raw price data for 5 assets, in a reprudicible and flexible way.  We have used three different methods for converting those daily prices to monthly, log returns.  From those three methods, we now have three objects: `asset_returns_xts` (an xts object), `asset_returns_tqtbl` (a tibble object created with tidyquant and timetk) and `asset_returns_tbltime` (a tibble object created with tidyquant, timetk and tibbletime packages). 
+Let's recap what we've done thus far. We have imported raw price data for 5 assets, in a reprudicible and flexible way.  We have used 4 different methods for converting those daily prices to monthly, log returns.  From those 4 methods, we now have 4 objects: `asset_returns_xts` (an xts object), `asset_returns_dplyr_byhand`, `asset_returns_tq_builtin` (a tibble object created with tidyquant and timetk) and `asset_returns_tbltime` (a tibble object created with tidyquant, timetk and tibbletime packages). 
 
-First, we can think of this as step 1 in a wholistic data science workflow, that begins with data import and transformation. To make this reproducible, step 1 needs to be so crystal clear that our colleagues will find it insultingly easy to follow our work. If we wish for our work to lay the ground work for several potential projects or test strategies, this first step needs to be clear and accessible.
+We can think of this as step 1 in a wholistic data science workflow, that begins with data import and transformation. To make this reproducible, step 1 needs to be so crystal clear that our colleagues will find it insultingly easy to follow our work. If we wish for our work to lay the ground work for several potential projects or test strategies, this first step needs to be clear and accessible.
 
-Second, there's a high likelihood that we will encounter work from other team members who have their own methods for data import and transformation.  The more methods we can master or at least practice, the better prepared we will be to reuse or expand on our colleagues' work.
+There's a high likelihood that we will encounter work from other team members who have their own methods for data import and transformation.  The more methods we can master or at least practice, the better prepared we will be to reuse or expand on our colleagues' work.
 
-Third, data import and transofrmation is straightforward, but it also forces us to engage with our data in its rawest form, instead of skipping ahead to the model and the R squared.  To me, a data scientist can never spend too much time getting to know his/her data. Perhaps new insights will jump out, or an error will be found, or a new hypothesis.  Furthermore, when it comes time to defend or update our findings or conclusions, deep knowledge of the raw data is crucial. 
+Data import and transofrmation is straightforward, but it also forces us to engage with our data in its rawest form, instead of skipping ahead to the model and the R squared.  To me, a data scientist can never spend too much time getting to know his/her data. Perhaps new insights will jump out, or an error will be found, or a new hypothesis.  Furthermore, when it comes time to defend or update our findings or conclusions, deep knowledge of the raw data is crucial. 
 
-Finally, if importing and transforming data seems painfully dull, I completely understand. But, it's part of being a data scientist. If this process is unbearably dull, data science might not be the ideal career path. 
+
+## Visualizing Asset Returns
+
 We could jump straight into the process of converting these assets into a portfolio, but it's good practice to have a quick peek at the individual charts before doing so. I find that once a portfolio is built, we're unlikely to back track to visualizing returns on an individual basis. Yet, those individual returns are the building blocks the raw material of our portfolio. Visualizing their returns adds another chance to get to know our raw data. 
 
-### Visualize Individual Returns
+For the purposes of visualizing returns, we will work with two of our monthly log returns objects, `asset_returns_xts` and `asset_returns_long`. 
 
-Now, let's visualize those individual asset returns. We are going to use the `asset_returns_tqtbl` for our visualization and `ggplot` to create a histogram. 
+First, let's use `highcharter` to  visualize the `xts` formatted returns.
 
-Careful readers and those familiar with the tidyverse might already know that we have a problem - our data is *not* in tidy format.  Each of our assets has its own column, which makes it quite readable for us humans. But it is not tidy. To be tidy, each variable needs to have its own column. And here, the variable "asset", does not have a column. Instead, each asset has its own column! In tidyverse nomenclature, this data is in wide format instead of long format. 
+Highcharter is fantastic for visualizing a time series or many time series.  First, we set `highchart(type = "stock")` to get a nice time series line. Then we add each of our series to the highcharter code flow. In this case, we'll add our columns from the xts object.
 
 ```{r}
-asset_returns_tqtbl_long <- 
-  asset_returns_tqtbl %>%
-  gather(asset, return, -date)
-  
-  
-head(asset_returns_tqtbl_long)
-head(asset_returns_tqtbl)
+highchart(type = "stock") %>% 
+  hc_title(text = "Monthly Log Returns") %>%
+  hc_add_series(asset_returns_xts$SPY, 
+                  name = names(asset_returns_xts$SPY)) %>%
+  hc_add_series(asset_returns_xts$EFA, 
+                  name = names(asset_returns_xts$EFA)) %>%
+  hc_add_series(asset_returns_xts$IJS, 
+                  name = names(asset_returns_xts$IJS)) %>%
+  hc_add_theme(hc_theme_flat()) %>%
+  hc_navigator(enabled = FALSE) %>% 
+  hc_scrollbar(enabled = FALSE)
+
 ```
 
-The best way to grasp the difference between long and wide data is to look at examples. The first data frame above is in long, tidy format. Each variable has its own column. This is how tidyverse packages like ggplot and dplyr want their date. The lower data frame is in wide format. I find this easier to digest as a human so I usually peak at my data in wide format. 
+Take a look at the chart. It has a line for the monthly log returns of 3 of our ETFs (and in my opinion it's already starting to get crowded). We might be able to pull some useful intuition from this chart. Perhaps one of our ETFs remained stable the 2008 financial crisis, or had an era of consistenly negative/positive returns. Highcharter is great for plotting time series line charts.
 
-
-
-Now we can visualize all 5 assets in one chart: 
-
+Highcharter does have the capacity for histogram making. One method is to first call the base function `hist` on the data along with the arguments for breaks and `plot = FALSE`. Then we can call `hchart` on that object. 
 
 ```{r}
-# Some aesthetic housekeeping: make so all titles centered.
+hc_spy <- hist(asset_returns_xts$SPY, breaks = 50, plot = FALSE)
+
+hchart(hc_spy) %>% 
+  hc_title(text = "SPY Log Returns Distribution")
+```
+
+For that, we will head to the tidyverse and use `ggplot2` on our tidy `tibble` `assets_returns_long`. Because it is in long, tidy format, and it is grouped by the 'asset' column, we can chart the asset histograms collectively on one chart. 
+
+```{r}
+# Make so all titles centered in the upcoming ggplots
 theme_update(plot.title = element_text(hjust = 0.5))
 
-asset_returns_tqtbl_long %>% 
-  ggplot(aes(x = return, colour = asset, fill = asset)) +
+asset_returns_long %>% 
+  ggplot(aes(x = returns, fill = asset)) + 
+  geom_histogram(alpha = 0.25, binwidth = .01)
+```
+
+Let's use `facet_wrap(~asset)` to break these out by asset. We can add a title with `ggtitle`.
+
+```{r}
+asset_returns_long %>% 
+  ggplot(aes(x = returns, fill = asset)) + 
+  geom_histogram(alpha = 0.25, binwidth = .01) + 
+  facet_wrap(~asset) + 
+  ggtitle("Monthly Returns Since 2005")
+```
+
+Maybe we don't want to use a histogram, but instead want to use a density line to visualize the various distributions. We can use the `stat_density(geom = "line", alpha = 1)` function to do this. The `alpha` argument is selecting a line thickness. Let's also add a label to the x and y axis with the `xlab` and `ylab` functions.
+
+```{r}
+
+asset_returns_long %>% 
+  ggplot(aes(x = returns, colour = asset, fill = asset)) +
+  stat_density(geom = "line", alpha = 1) +
+  ggtitle("Monthly Returns Since 2005") +
+  xlab("monthly returns") +
+  ylab("distribution") 
+
+```
+
+That chart is quite digestible, but we can also `facet_wrap(~asset)` to break the densities out into individual charts.
+
+```{r}
+asset_returns_long %>% 
+  ggplot(aes(x = returns, colour = asset, fill = asset)) +
   stat_density(geom = "line", alpha = 1) +
   facet_wrap(~asset) +
   ggtitle("Monthly Returns Since 2005") +
@@ -236,37 +320,24 @@ asset_returns_tqtbl_long %>%
   ylab("distribution") 
 ```
 
-```{r}
-# Some aesthetic housekeeping: make so all titles centered.
-theme_update(plot.title = element_text(hjust = 0.5))
+Now we can combine all of our ggplots into one nice, faceted plot. 
 
-asset_returns_tqtbl_long %>% 
-  ggplot(aes(x = return, colour = asset, fill = asset)) +
-  geom_histogram(alpha = 0.25, binwidth = .005) +
-  facet_wrap(~asset) +
-  ggtitle("Monthly Returns Since 2005") +
-  xlab("monthly returns") +
-  ylab("distribution") 
-```
+At the same time, to add to the aesthetic toolkit a bit, we will do some editing to the label colors. First off, let's choose a different color besides black to be the theme. I will go with cornflower blue, because it's a nice shade and I don't see it used very frequently elsewhere. Once we have a color, we can choose the different elements of the chart to change in the the `theme` function. I make a lot of changes here by way of example but feel free to comment out a few of those lines and see the different options.
 
-We can also combine these into one chart. Do we love the black font color? It's alright but I try to choose a color that doesn't appear very frequently: corn flower blue. It's a nice color but more importantly, it will help viewers to begin to associate your team's charts with a certain color scheme.
 
 ```{r}
-
-# Some aesthetic housekeeping: make so all titles centered.
-theme_update(plot.title = element_text(hjust = 0.5))
-
-asset_returns_tqtbl_long %>% 
-  ggplot(aes(x = return, colour = asset, fill = asset)) +
+asset_returns_long %>% 
+  ggplot(aes(x = returns, colour = asset, fill = asset)) +
   stat_density(geom = "line", alpha = 1) +
-  geom_histogram(alpha = 0.25, binwidth = .005) +
+  geom_histogram(alpha = 0.25, binwidth = .01) +
   facet_wrap(~asset) +
   ggtitle("Monthly Returns Since 2005") +
   xlab("monthly returns") +
   ylab("distribution") +
+  # Lots of elements can be customized in the theme() function
   theme(plot.title = element_text(colour = "cornflowerblue"),  
-        strip.text.x = element_text(size = 8, colour = "cornflowerblue"), 
-        strip.background = element_rect(colour = "cornflowerblue", fill = "white"), 
+        strip.text.x = element_text(size = 8, colour = "white"), 
+        strip.background = element_rect(colour = "white", fill = "cornflowerblue"), 
         axis.text.x = element_text(colour = "cornflowerblue"), 
         axis.text = element_text(colour = "cornflowerblue"), 
         axis.ticks.x = element_line(colour = "cornflowerblue"), 
@@ -278,11 +349,11 @@ asset_returns_tqtbl_long %>%
         )
 ```
 
-Now that we have visualized, do we notice anything about the distribution of returns? We will discuss this in the next chapter when we consider our portfolio and examine how combining these 5 assets leads to a new distribution of returns. 
+We now have one chart, with histograms and line densities broken out for each of our assets. This would scale nicely if we had more assets and wanted to peek at more distributions of returns.
 
+We have not done any substantive work today but the chart of monthly returns is a tool to quickly glance at the data and see if anything unusual jumps out, or some sort of hypothesis comes to mind. We are going to be combining these assets into a portfolio and, once that occurs, we will rarely view the assets in isolation again. Before that leap to portfolio building, it's a good idea to glance at the portfolio component distributions. 
 
-### To the Portfolio Station
-
+## To the Portfolio Station
 
 Going from a collection of individual returns to a portfolio, which is really a weighted collection of asset returns. Accordingly, the first thing we need to do is assign a weight to each portfolio. Recall that our vector of weights is `r symbols`. Let's create a weights vector that will allow us to assign a weight to each of our symbols. We are going for a balanced portfolio but we will still weight relatively little to AGG, the bond fund.
 

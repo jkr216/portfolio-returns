@@ -121,7 +121,6 @@ Our last two steps are to `spread` the data back to wide format, which makes it 
 Finally, we want to reorder the columns to align with the `symbols` vector. That's important because when we build a portfolio, we will use that vector to coordinate our different weights. 
 
 ```{r}
-
 asset_returns_dplyr_byhand <- prices %>% 
   to.monthly(indexAt = "last", OHLC = FALSE) %>% 
   tk_tbl(preserve_index = TRUE, rename_index = "date") %>%
@@ -173,7 +172,7 @@ head(asset_returns_tbltime)
 
 First, have a look at the left most column in each object, where the date is stored. The `asset_returns_xts` has a date index, not a column. It is accessed via `index(asset_returns_xts)`. The data frame objects have a column called "date", accessed via the `$date` convention, e.g. `asset_returns_dplyr_byhand$date`. 
 
-Second, notice the first observation in each of the objects. Only `asset_returns_tqtbl` has an observation for January of 2005. The other 3 elided January of 2005 when we cast from daily to monthly. Do we care? Does it matter to our final calculations? Perhaps and probably. Either way, we need to be aware of the consequences of taking our raw data and reshaping it via different methods.
+Second, notice the first observation in each of the objects. For some reason, only one of our objects, `asset_returns_tq_builtin`, contains a value for the row of January 2005. `asset_returns_dplyr_byhand` reports a January 2005 return of NA, `asset_returns_dplyr_byhand` reports a 0.00, and `asset_returns_xts` simply excludes the observation.  Does it matter? Well, probably yes.  It will affect all of our analysis for the remainder of this book and if we were constructing a true trading strategy or portfolio management workflow, real money could be affected if we use the object that includes or excludes the first observation.
 
 Third, each of these objects is in "wide" format, which in this case means there is a column for each of our assets.  When we called `spread` at the end of the piped code flow, we put the data frames back to wide format.
 
@@ -181,7 +180,7 @@ This is the format that `xts` likes and it's the format that is easier to read a
 For our asset_returns objects, that would mean a column called "date", a colum called "asset" and a column called "returns".  To see that in action, here is how it looks. 
 
 ```{r}
-asset_returns_long_format <- 
+asset_returns_long <- 
   asset_returns_dplyr_byhand %>% 
   gather(asset, returns, -date)
 
