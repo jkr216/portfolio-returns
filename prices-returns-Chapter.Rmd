@@ -373,7 +373,337 @@ asset_weights_sanity_check
 
 ```
 
-Put in the portfolio code; by hand returns; built in function for contributions from perfan and tidyquant? 
+Does that tibble match up with the portfolio we want to create? Looks good to me.
 
+Finally, make sure the weights sum to 100%, or 1. Again, we can eyeball this with 5 assets, but with 50 assets it would be easier to run the sanity check.
+
+```{r}
+sum(asset_weights_sanity_check$w)
+```
+
+
+### From Individual Returns to One Portfolio Return
+
+We will start with the textbook equation for the return of a multi-asset portfolio which is: 
+$$Return_{portfolio} = W_{1}*Return_{asset1}~+~W_{2}*Return_{asset2}~+~W_{3}*Return_{asset3}~+~W_{4}*Return_{asset4}~+~W_{5}*Return_{asset5}$$
+
+```{r By Hand Return}
+
+# Let's assign each asset a weight from our weights vector above.
+
+w_1 <- w[1]
+w_2 <- w[2]
+w_3 <- w[3]
+w_4 <- w[4]
+w_5 <- w[5]
+
+# And each asset has a return as well, stored in our 
+# asset_returns_xts object.
+
+asset1 <- asset_returns_xts[,1]
+asset2 <- asset_returns_xts[,2]
+asset3 <- asset_returns_xts[,3]
+asset4 <- asset_returns_xts[,4]
+asset5 <- asset_returns_xts[,5]
+
+portfolio_returns_byhand <-   
+  (w_1 * asset1) + 
+  (w_2 * asset2) + 
+  (w_3 * asset3) +
+  (w_4 * asset4) + 
+  (w_5 * asset5)
+
+names(portfolio_returns_byhand) <- "returns"
+```
+
+
+For our first method, we will stay in the `xts` world and use the `Return.portfolio` function from the `Performance Analytics` package.  You might have noticed that we didn't explicitly load that package and that is because `tidyquant` imports this package for us.  The function requires two arguments for a portfolio, an `xts` object of returns and a vector of weights.  It's not necessary but we are also going to set `rebalance_on = "months"` so we can confirm it matches our by hand calculations above. Remember, in the by hand equation, we set the portfolio weights as fixed, meaning they never change on a month to month basis. That is equivalent to rebalancing every month. In practice, that would be quite rare. Once we confirm that it matches our by hand, we can toggle over to a more realistic annual rebalancing by chaning the argument to `rebalance_on = "years"`.
+
+
+```{r}
+
+portfolio_returns_xts_rebalanced_monthly <- 
+  Return.portfolio(asset_returns_xts, weights = w, rebalance_on = "months") %>%
+  `colnames<-`("returns")
+
+```
+
+Let's use the build in `Return.portfolio` function again but we will set a more realistic annual rebalancing with the argument `rebalance_on = "years"`.  This will change our results so that they no longer our by-hand calculation, which effectiely rebalanced every month. 
+
+```{r}
+portfolio_returns_xts_rebalanced_yearly <- 
+  Return.portfolio(asset_returns_xts, weights = w, rebalance_on = "years") %>%
+  `colnames<-`("returns")
+```
+
+We can take a peek at our three portfolio objects and see how the annual rebalance made a small but important difference. This will become clearer at the conclusion of this section when we calculate the growth of a dollar in the portfolio.
+
+```{r}
+head(portfolio_returns_byhand)
+head(portfolio_returns_xts_rebalanced_monthly)
+head(portfolio_returns_xts_rebalanced_yearly)
+```
+
+As before, we could stop here and have accomplished our substantive task (twice already - by hand and using the built in function), but we want to explore alternate methods in the world of tidyverse and tidyquant. We will use our long, tidy formatted `asset_returns_long` and convert to portfolio returns using the `tq_portfolio` function from `tidyquant`.  
+
+The `tq_portfolio` function takes a tibble and then asks for an assets column to group by, a returns column to find return data, and a weights column. It's a wrapper for `Return.portfolio` and thus also accepts the argument `rebalance_on = "months"`.  Since we are rebalancing by months, we should again get a portfolio returns object that matches our two existing objects `portfolio_returns_byhand` and `portfolio_returns_xts_rebalanced_monthly.`   
+
+```{r}
+portfolio_returns_tq_rebalanced_monthly <- 
+  asset_returns_long %>%
+  tq_portfolio(assets_col  = asset, 
+               returns_col = returns,
+               weights     = w,
+               col_rename  = "returns",
+               rebalance_on = "months")
+```
+
+If we want rebalance annually, it'st the same code as above, except we set `rebalance_on = "years"`.
+
+```{r}
+portfolio_returns_tq_rebalanced_yearly <- 
+  asset_returns_long %>%
+  tq_portfolio(assets_col  = asset, 
+               returns_col = returns,
+               weights     = w,
+               col_rename  = "returns",
+               rebalance_on = "years")
+```
+
+We now have two more portfolio returns objects and they are both tidy tibbles. Let's take a quick look and compare how a tidy tibble of portfolio returns compares to an xts object of portfolio returns. 
+
+```{r}
+head(portfolio_returns_tq_rebalanced_yearly)
+head(portfolio_returns_xts_rebalanced_yearly)
+```
+
+Since there is only one column of returns, there is not wide versus long format for the tibble and it looks almost identical to the `xts` object. The only difference is the date: the tibble has a column that holds the date that can be accessed with the $ operator, whereas the xts object has a date index, accessed with `index`.  
+
+### Visualize
+
+First, let's use `highcharter` to  visualize the `xts` formatted portfolio returns.
+
+As we noted when looking at individual asset returns, Highcharter is fantastic for visualizing a time series or many time series.  First, we set `highchart(type = "stock")` to get a nice time series line. Then we add our `returns` column from the portfolio returns `xts` object.  We don't have to add the date index or point to it in any way. Highcharter recognizes the `xts` object and ports over the date index under the hood.
+
+```{r}
+highchart(type = "stock") %>% 
+  hc_title(text = "Porftolio Monthly Returns") %>%
+  hc_add_series(portfolio_returns_xts_rebalanced_yearly$returns, 
+                  name = "Rebalanced Yearly", color = "cornflowerblue") %>%
+  hc_add_theme(hc_theme_flat()) %>%
+  hc_navigator(enabled = FALSE) %>% 
+  hc_scrollbar(enabled = FALSE)
+
+```
+
+Let's add one of our more volatile assets and see if anything looks interesting
+
+```{r}
+
+highchart(type = "stock") %>% 
+  hc_title(text = "Porftolio Monthly Returns") %>%
+  hc_add_series(portfolio_returns_xts_rebalanced_yearly$returns, 
+                  name = "Rebalanced Yearly", color = "cornflowerblue", lineWidth = 3) %>%
+  hc_add_series(asset_returns_xts$IJS, 
+                  name = "IJS", color = "pink", lineWidth = 1.5) %>%
+   hc_add_series(asset_returns_xts$AGG, 
+                  name = "AGG", color = "green", lineWidth = 1.5) %>%
+  hc_add_theme(hc_theme_flat()) %>%
+  hc_navigator(enabled = FALSE) %>% 
+  hc_scrollbar(enabled = FALSE)
+```
+
+Take a look at the chart.
+
+As before, we can use Highcharter for histogram making as well. One method is to first call the base function `hist` on the data along with the arguments for breaks and `plot = FALSE`. Then we can call `hchart` on that object. 
+
+```{r}
+hc_portfolio <- hist(portfolio_returns_xts_rebalanced_yearly$returns, breaks = 50, plot = FALSE)
+
+hchart(hc_portfolio) %>% 
+  hc_title(text = "Portfolio Log Returns Distribution")
+```
+
+As we noted in the previous section on asset returns, there's nothing wrong with that highcharter histogram. It displays well the distribution of portfolio returns. It does not, however, offer as much flexibility as `ggplot` for adding other distributions or density lines to the same chart. 
+
+For that, we will head to the tidyverse and use `ggplot2` on our tidy `tibble` `portfolio_returns_tq_rebalanced_yearly`.
+
+```{r}
+# Make so all titles centered in the upcoming ggplots
+theme_update(plot.title = element_text(hjust = 0.5))
+
+portfolio_returns_tq_rebalanced_yearly %>% 
+  ggplot(aes(x = returns)) + 
+  geom_histogram(alpha = 1, binwidth = .01, fill = "cornflowerblue", color = "cornflowerblue")
+```
+
+Let's try to compare the portfolio distribution to that of our assets. Use the alpha argument to make the asset histograms a bid faded, since there are more of them and the portfolio return is what we really want to see.
+
+```{r}
+asset_returns_long %>%  
+  ggplot(aes(x = returns, fill = asset)) + 
+  geom_histogram(alpha = 0.15, binwidth = .01) +
+  geom_histogram(data = portfolio_returns_tq_rebalanced_yearly, fill = "cornflowerblue") +
+  ggtitle("Monthly Returns Since 2005")
+
+```
+
+
+Maybe we don't want to use a histogram, but instead want to use a density line to visualize the various distributions. We can use the `stat_density(geom = "line", alpha = 1)` function to do this. The `alpha` argument is selecting a line thickness. Let's also add a label to the x and y axis with the `xlab` and `ylab` functions.
+
+```{r}
+
+portfolio_returns_tq_rebalanced_yearly %>% 
+  ggplot(aes(x = returns)) +
+  stat_density(geom = "line", alpha = 1, colour = "cornflowerblue") +
+  ggtitle("Portfolio Monthly Returns Since 2005") +
+  xlab("monthly returns") +
+  ylab("distribution") 
+
+```
+
+That chart is quite digestible, but we can also `facet_wrap(~asset)` to break the densities out into individual charts.
+
+```{r}
+# could also combine to one for v
+
+portf_asset_returns_density <- 
+  ggplot(data =  asset_returns_long, 
+         aes(x = returns)) +
+  stat_density(geom = "line", 
+               alpha = 1,
+               aes(colour = asset)) +
+  stat_density(data = portfolio_returns_tq_rebalanced_yearly, 
+               geom = "line",
+               alpha = 1,
+               aes(colour = returns)) +
+  ggtitle("Portfolio and Asset Monthly Returns Since 2005") +
+  xlab("monthly returns") +
+  ylab("distribution") 
+
+portf_asset_returns_density
+```
+
+Now let's put portfolio returns histogram and density on one plot.
+
+```{r}
+portfolio_returns_tq_rebalanced_yearly %>% 
+  ggplot(aes(x = returns)) +
+  geom_histogram(alpha = 1, binwidth = .01, colour = "cornflowerblue", fill = "cornflowerblue") +
+  stat_density(geom = "line", alpha = 1, color = "pink") +
+  ggtitle("Portfolio Monthly Returns Since 2005") +
+  xlab("monthly returns") +
+  ylab("distribution") +
+  # Lots of elements can be customized in the theme() function
+  theme(plot.title = element_text(colour = "cornflowerblue"), 
+        axis.text.x = element_text(colour = "cornflowerblue"), 
+        axis.text = element_text(colour = "cornflowerblue"), 
+        axis.ticks.x = element_line(colour = "cornflowerblue"), 
+        axis.text.y = element_text(colour = "cornflowerblue"), 
+        axis.ticks.y = element_line(colour = "cornflowerblue"),
+        axis.title = element_text(colour = "cornflowerblue")
+        )
+```
+
+
+We have covered the process of importing daily price data for 5 assets, converting to monthly log returns for those assets, and then converting to portfolio returns after assigning weights to those assets. 
+
+
+```{r}
+portfolio_growth_byhand <- cumprod(1 + portfolio_returns_byhand$returns)
+```
+
+
+```{r}
+portfolio_growth_xts_rebalanced_monthly <- 
+  Return.portfolio(asset_returns_xts, 
+                   wealth.index = 1, weights = w, rebalance_on = "months") %>%
+  `colnames<-`("growth") 
+
+```
+
+Now on to 
+
+```{r}
+portfolio_growth_tq_rebalanced_monthly <- 
+  asset_returns_long %>%
+  tq_portfolio(assets_col  = asset, 
+               returns_col = returns,
+               weights     = w,
+               col_rename  = "returns",
+               rebalance_on = "months", 
+               wealth.index = 1) %>% 
+  slice(-1)
+  
+```
+
+
+Let's explore one more method using the `purrr` package from the tidyverse. `purrr` contains a lot of useful functions and the `map()` family is most used, but another very useful function is `accumulate()`. As the name implies, this function allows us to accumulate calculations in a recursive way, meaning we can use prior calculations the same way we would in a for loop or with `cumprod()`. We will make use of this when we get to monte carlo simulations. The code below shows how to use accumulate to get the growth of a dollar. 
+
+```{r}
+portfolio_growth_purrr <- 
+  asset_returns_long %>%
+  tq_portfolio(assets_col  = asset, 
+               returns_col = returns,
+               weights     = w,
+               col_rename  = "returns",
+               rebalance_on = "months") %>% 
+  slice(-1) %>% 
+  mutate(growth_1 = accumulate(1 + returns, `*`),
+         growth_2 = accumulate(1 + returns, function(x, y) x * y)) %>% 
+  select(date, growth_1, growth_2)
+```
+
+We've now calculated the growth of a dollar in several ways: using cumprod and dplyr, using the built-in functions with `perfromanceAnalytics` and `tidyquant`, and using the `accumulate()` function from `purrr`. Let's confirm that we got consistent results.  
+
+```{r}
+final_comparison <- 
+  merge.xts(portfolio_growth_byhand, portfolio_growth_xts_rebalanced_monthly) %>% 
+  tk_tbl(preserve_index = TRUE, rename_index = "date") %>% 
+  bind_cols(portfolio_growth_purrr) %>% 
+  select(-date1) %>% 
+  bind_cols(portfolio_growth_tq_rebalanced_monthly) %>% 
+  select(-date1) %>%
+  `colnames<-`(c("date", "by_hand", "xts", "purrr1", "purrr2", "tq"))
+```
+
+A lot of grinding but we can be confident in these methods and the results, and should any of our colleagues wish to reproduce our results and extend them, a plethora of code paths is available to them. Our different object structures will also lend themselves to different visualizations techniques which was our original motivation here, to create a more intuitive way to understand our returns. Most investors care about how their money grows on a cumulative basis and monthly returns, though interesting to quantitative types and distribution aficianados, can be difficult to interpret. Growth of a dollar is not a perfect measure of a portfolio's quality (we haven't even gotten to risk yet!) but it's where many people will start. Let's chart it. 
+
+```{r}
+library(highcharter)
+
+highchart(type = "stock") %>% 
+  hc_title(text = "Growth of a Dollar") %>%
+  hc_add_series(portfolio_growth_xts_rebalanced_monthly, 
+                  name = "Portfolio", color = "cornflowerblue", lineWidth = 1) %>%
+  hc_yAxis(title = list(text = "growth of dollar"),
+           opposite = FALSE,
+           labels = list(format = "${value}")) %>% 
+  hc_add_theme(hc_theme_flat()) %>%
+  hc_navigator(enabled = FALSE) %>% 
+  hc_scrollbar(enabled = FALSE)
+```
+
+
+
+```{r}
+library(scales)
+portfolio_growth_purrr %>%
+  ggplot(aes(x = date, y = growth_1)) + 
+  geom_line(colour = "cornflowerblue") + 
+  ylab("dollar growth") +
+  xlab("month") +
+  ggtitle("Growth of a Dollar") +
+  scale_y_continuous(breaks = pretty_breaks(n = 10), labels = dollar) +
+  scale_x_date(breaks = pretty_breaks(n = 10))
+```
+
+
+For this pure time series plotting, `highcharter` offers a slightly better aesthetic experience since it allows the end user to choose different time frames. That will come in very handy when take our work to Shiny in the next section. 
+
+Before we leave the returns to dollar growth substance, 
+
+
+### On to Shiny
 
 

@@ -121,7 +121,8 @@ Our last two steps are to `spread` the data back to wide format, which makes it 
 Finally, we want to reorder the columns to align with the `symbols` vector. That's important because when we build a portfolio, we will use that vector to coordinate our different weights. 
 
 ```{r}
-asset_returns_dplyr_byhand <- prices %>% 
+asset_returns_dplyr_byhand <- 
+  prices %>% 
   to.monthly(indexAt = "last", OHLC = FALSE) %>% 
   tk_tbl(preserve_index = TRUE, rename_index = "date") %>%
   gather(asset, returns, -date) %>% 
@@ -176,7 +177,8 @@ Second, notice the first observation in each of the objects. For some reason, on
 
 Third, each of these objects is in "wide" format, which in this case means there is a column for each of our assets.  When we called `spread` at the end of the piped code flow, we put the data frames back to wide format.
 
-This is the format that `xts` likes and it's the format that is easier to read as a human. However, the tidyverse wants this data to be in long or tidy format so that each variable has its own column. 
+This is the format that `xts` likes and it's the format that is easier to read as a human. However, the tidyverse wants this data to be in long or tidy format so that each variable has its own column.
+
 For our asset_returns objects, that would mean a column called "date", a colum called "asset" and a column called "returns".  To see that in action, here is how it looks. 
 
 ```{r}
